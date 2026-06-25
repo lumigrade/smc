@@ -33,6 +33,7 @@
          font:inherit; font-size:13px; font-weight:600; padding:9px 15px; border-radius:9px; cursor:pointer; transition:.15s; }
   .btn:hover { background:rgba(255,255,255,.10); } .btn.on { background:var(--gold); color:#1a1206; border-color:var(--gold); }
   .btn.ghost { font-weight:500; color:var(--mut); }
+  .sep { width:1px; align-self:stretch; background:rgba(255,255,255,.14); margin:2px 3px; }
 
   /* interactive legend / controls */
   #ctrls { bottom:74px; left:50%; transform:translateX(-50%); padding:10px 14px; display:grid; gap:9px; }
@@ -79,7 +80,7 @@
   <div class="sub">≈ <b id="massnum">—</b> tonnes</div>
 </div>
 
-<div id="ctrls" class="panel">
+<div id="ctrls" class="panel" style="display:none">
   <div class="crow"><span class="dot" style="background:var(--gold)"></span><label>Material</label>
     <input type="color" id="matColor" value="#f0b44a"><input type="range" id="matOpac" min="5" max="100" value="100"></div>
   <div class="crow"><span class="dot" style="background:var(--steel)"></span><label>Truck &amp; bed</label>
@@ -90,12 +91,16 @@
   <button class="btn on" data-view="full">Full load</button>
   <button class="btn" data-view="empty">Empty bed</button>
   <button class="btn" data-view="material">Material only</button>
+  <span class="sep"></span>
+  <button class="btn on" data-theme="rainbow">🌈 Height</button>
+  <button class="btn" data-theme="type">Steel + Gold</button>
   <button class="btn ghost" id="spin">⟳ Spin</button>
 </div>
 
 <div id="note" class="panel"><b>How it works:</b> the LiDAR point cloud is a real measurement (no CAD).
   Every point above the empty-bed surface is classified as material; the volume is the integral of that
-  height difference over the bed. Use the sliders to recolour or fade the load vs the truck/bed.</div>
+  height difference over the bed. <b>🌈 Height</b> colours points by elevation; <b>Steel + Gold</b> tints
+  the load vs the truck (with recolour / fade sliders).</div>
 <div id="hint" class="panel">drag to rotate · scroll / pinch to zoom</div>
 
 <script type="importmap">
@@ -116,7 +121,18 @@ const app = document.getElementById('app');
 const renderer = new THREE.WebGLRenderer({ antialias:true, preserveDrawingBuffer:true });
 renderer.setPixelRatio(Math.min(devicePixelRatio,2)); renderer.setSize(innerWidth,innerHeight); app.appendChild(renderer.domElement);
 
-const VER = '13';                      // bump every redeploy to bust browser/CDN cache
+const VER = '14';                      // bump every redeploy to bust browser/CDN cache
+// turbo colormap (matplotlib) lookup table — the "rainbow by height" theme
+const TURBO_LUT = [48,18,59,54,33,95,59,47,128,64,64,162,67,78,186,69,94,211,70,107,227,71,123,242,70,135,251,65,150,255,58,163,252,49,175,245,39,190,233,31,201,221,25,213,205,24,222,192,29,231,178,39,238,164,56,244,145,74,248,128,93,252,111,117,254,92,136,255,78,156,254,64,169,251,57,185,246,53,198,240,52,212,231,53,223,223,55,233,213,57,242,201,58,248,190,57,252,177,54,254,164,49,254,147,42,252,132,35,248,114,28,243,99,21,237,85,16,229,71,11,221,61,8,210,49,5,200,40,3,185,30,2,172,23,1,155,15,1,139,9,2,122,4,3];
+const VMAX = 3.5;                      // truck height for the height->colour mapping
+function turboColor(t){
+  t = t < 0 ? 0 : (t > 0.9999 ? 0.9999 : t);
+  const f = t * 47, i = f | 0, a = f - i;
+  return [TURBO_LUT[i*3]*(1-a)+TURBO_LUT[i*3+3]*a,
+          TURBO_LUT[i*3+1]*(1-a)+TURBO_LUT[i*3+4]*a,
+          TURBO_LUT[i*3+2]*(1-a)+TURBO_LUT[i*3+5]*a];
+}
+let theme = 'rainbow';                 // default per client request
 const scene = new THREE.Scene(); scene.fog = new THREE.FogExp2(0x0b1016, 0.016);
 const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.1, 2000);
 camera.up.set(0,0,1); camera.position.set(9,-11,6.0);
@@ -137,7 +153,8 @@ function frameAll(){
   // height against the vertical FOV, then view it broadside-3/4 so it reads as a
   // truck (not foreshortened end-on).
   const vfov = THREE.MathUtils.degToRad(camera.fov);
-  const hfov = 2*Math.atan(Math.tan(vfov/2)*camera.aspect);
+  const asp = Math.max(camera.aspect || 1.6, 0.4);   // guard a 0-size window at frame time
+  const hfov = 2*Math.atan(Math.tan(vfov/2)*asp);
   const len = Math.max(s.x, s.y), hgt = s.z;
   const dist = Math.max( (len/2)/Math.tan(hfov/2), (hgt/2)/Math.tan(vfov/2) ) * 1.32;
   const dir = new THREE.Vector3(0.25, -0.95, 0.30).normalize();  // side-3/4, lower elevation (long truck reads better)
@@ -158,10 +175,13 @@ const clouds = {};
 function makeCloud(buf, material){
   const N = new DataView(buf).getUint32(0,true);
   const pos = new Float32Array(buf, 4, N*3);
-  const col = new Uint8Array(buf.slice(4+N*12, 4+N*12+N*3));
+  const gray = new Uint8Array(buf.slice(4+N*12, 4+N*12+N*3));
+  const turbo = new Uint8Array(N*3);
+  for (let i=0;i<N;i++){ const c=turboColor(pos[i*3+2]/VMAX); turbo[i*3]=c[0]; turbo[i*3+1]=c[1]; turbo[i*3+2]=c[2]; }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos,3));
-  g.setAttribute('color', new THREE.BufferAttribute(col,3,true));
+  g.setAttribute('color', new THREE.BufferAttribute(new Uint8Array(theme==='rainbow' ? turbo : gray),3,true));
+  g.userData = { gray, turbo };               // source arrays; setTheme copies into the live color attr
   g.computeBoundingSphere();
   return new THREE.Points(g, material);
 }
@@ -182,6 +202,16 @@ matOpac.oninput  = e => setOpac(matMat, e.target.value/100);
 bedColor.oninput = e => bedMat.color.set(e.target.value);
 bedOpac.oninput  = e => setOpac(bedMat, e.target.value/100);
 
+function setTheme(t){
+  theme = t;
+  for (const k in clouds){ const ca = clouds[k].geometry.getAttribute('color');
+    ca.array.set(t==='rainbow' ? clouds[k].geometry.userData.turbo : clouds[k].geometry.userData.gray); ca.needsUpdate = true; }
+  if (t==='rainbow'){ bedMat.color.set(0xffffff); matMat.color.set(0xffffff); ctrls.style.display='none'; }
+  else { bedMat.color.set(bedColor.value); matMat.color.set(matColor.value); ctrls.style.display='grid'; }
+  document.querySelectorAll('#ctl .btn[data-theme]').forEach(b => b.classList.toggle('on', b.dataset.theme===t));
+}
+document.querySelectorAll('#ctl .btn[data-theme]').forEach(b => b.addEventListener('click', () => setTheme(b.dataset.theme)));
+
 let spinning=false;
 document.getElementById('spin').addEventListener('click', e => { spinning=!spinning; e.target.classList.toggle('on', spinning); });
 addEventListener('resize', () => { camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); if(!userMoved) frameAll(); });
@@ -197,7 +227,7 @@ function animate(){
   try { const m = await (await fetch('clouds/meta.json?v='+VER)).json();
     truckid.textContent=m.truck; volnum.innerHTML=m.volume_m3+' <span>m³</span>'; massnum.textContent=m.mass_t; } catch(e){}
   await Promise.all([ load('structure', bedMat), load('material', matMat), load('empty', bedMat) ]);
-  show('full'); frameAll(); loadEl.classList.add('gone'); animate();
+  show('full'); setTheme('rainbow'); frameAll(); loadEl.classList.add('gone'); animate();
   // re-frame after the viewport settles (mobile address-bar / late layout) until the user interacts
   requestAnimationFrame(()=>{ if(!userMoved) frameAll(); });
   setTimeout(()=>{ if(!userMoved) frameAll(); }, 500);
