@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>SMC — Truck Material Volume by 3D LiDAR</title>
+<style>
+  :root { --gold:#f0b44a; --steel:#8aa0b8; --bg0:#0b1016; --bg1:#131c27; --ink:#e8eef5; --mut:#9fb0c2; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { height:100%; overflow:hidden; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+         background:radial-gradient(120% 120% at 50% 0%, #16212e 0%, var(--bg0) 70%); color:var(--ink); }
+  #app { position:fixed; inset:0; }
+  canvas { display:block; }
+
+  .panel { position:fixed; background:rgba(13,20,28,.72); backdrop-filter:blur(8px);
+           border:1px solid rgba(255,255,255,.08); border-radius:14px; }
+  /* header */
+  #hdr { top:16px; left:16px; padding:14px 18px; max-width:min(360px,calc(100vw - 32px)); }
+  #hdr .tag { font-size:11px; letter-spacing:.18em; color:var(--gold); font-weight:700; text-transform:uppercase; }
+  #hdr h1 { font-size:18px; font-weight:700; margin-top:3px; line-height:1.25; }
+  #hdr p { font-size:12.5px; color:var(--mut); margin-top:6px; line-height:1.5; }
+  #hdr .truck { color:var(--ink); font-weight:600; }
+
+  /* volume card */
+  #vol { top:16px; right:16px; padding:14px 18px; text-align:right; min-width:170px; }
+  #vol .lbl { font-size:11px; letter-spacing:.14em; color:var(--mut); text-transform:uppercase; }
+  #vol .big { font-size:40px; font-weight:800; line-height:1; margin-top:4px;
+              background:linear-gradient(180deg,#ffd98a,#f0b44a); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  #vol .big span { font-size:18px; font-weight:700; color:var(--gold); -webkit-text-fill-color:var(--gold); }
+  #vol .sub { font-size:13px; color:var(--ink); margin-top:6px; }
+  #vol .sub b { color:var(--gold); }
+
+  /* controls */
+  #ctl { bottom:18px; left:50%; transform:translateX(-50%); padding:8px; display:flex; gap:6px; flex-wrap:wrap; justify-content:center; }
+  .btn { appearance:none; border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.04); color:var(--ink);
+         font:inherit; font-size:13px; font-weight:600; padding:9px 15px; border-radius:9px; cursor:pointer; transition:.15s; }
+  .btn:hover { background:rgba(255,255,255,.10); }
+  .btn.on { background:var(--gold); color:#1a1206; border-color:var(--gold); }
+  .btn.ghost { font-weight:500; color:var(--mut); }
+
+  /* legend */
+  #leg { bottom:74px; left:50%; transform:translateX(-50%); display:flex; gap:18px; font-size:12.5px; color:var(--mut);
+         background:rgba(13,20,28,.55); padding:7px 14px; border-radius:20px; border:1px solid rgba(255,255,255,.07); }
+  #leg b { color:var(--ink); font-weight:600; }
+  .dot { display:inline-block; width:11px; height:11px; border-radius:50%; vertical-align:-1px; margin-right:6px; }
+
+  /* footer note + hint */
+  #note { bottom:16px; right:16px; max-width:min(320px,calc(100vw - 32px)); padding:11px 14px; font-size:11.5px; color:var(--mut); line-height:1.55; }
+  #note b { color:var(--ink); }
+  #hint { bottom:16px; left:16px; font-size:11px; color:var(--mut); padding:8px 12px; }
+
+  #load { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:14px;
+          background:var(--bg0); z-index:50; transition:opacity .5s; }
+  #load.gone { opacity:0; pointer-events:none; }
+  .spin { width:34px; height:34px; border:3px solid rgba(255,255,255,.15); border-top-color:var(--gold); border-radius:50%; animation:sp 1s linear infinite; }
+  @keyframes sp { to { transform:rotate(360deg); } }
+  #load div { color:var(--mut); font-size:13px; letter-spacing:.04em; }
+
+  @media (max-width:640px){
+    #hdr{max-width:calc(100vw - 90px - 24px);} #vol{min-width:0;padding:10px 12px;} #vol .big{font-size:30px;}
+    #note{display:none;} #hint{display:none;} #hdr p{display:none;}
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="load"><div class="spin"></div><div>Loading 3D scan…</div></div>
+
+<div id="hdr" class="panel">
+  <div class="tag">Smart Material Control</div>
+  <h1>Truck load volume<br>measured by 3D LiDAR</h1>
+  <p>Live 3D scan of truck <span class="truck" id="truckid">37H11558</span> at the gate.
+     Two cross-mounted SICK scanners fuse into one model; comparing the
+     <b>full</b> vs <b>empty</b> bed measures the material automatically.</p>
+</div>
+
+<div id="vol" class="panel">
+  <div class="lbl">Material on board</div>
+  <div class="big" id="volnum">— <span>m³</span></div>
+  <div class="sub">≈ <b id="massnum">—</b> tonnes</div>
+</div>
+
+<div id="leg" class="panel">
+  <span><span class="dot" style="background:var(--gold)"></span><b>Material</b> (the load)</span>
+  <span><span class="dot" style="background:var(--steel)"></span><b>Truck &amp; bed</b></span>
+</div>
+
+<div id="ctl" class="panel">
+  <button class="btn on" data-view="full">Full load</button>
+  <button class="btn" data-view="empty">Empty bed</button>
+  <button class="btn" data-view="material">Material only</button>
+  <button class="btn ghost" id="spin">⟳ Spin</button>
+</div>
+
+<div id="note" class="panel"><b>How it works:</b> the LiDAR point cloud is a real measurement (no CAD).
+  Every point above the empty-bed surface is classified as material; the volume is the integral of that
+  height difference over the bed. Demonstrates the solution end-to-end on one real truck.</div>
+<div id="hint" class="panel">drag to rotate · scroll / pinch to zoom</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const loadEl = document.getElementById('load');
+function fail(msg){ loadEl.classList.remove('gone');
+  loadEl.innerHTML = '<div style="max-width:320px;text-align:center;color:#f0b44a;line-height:1.6">'+msg+'</div>'; }
+window.addEventListener('error', e => fail('Could not load the 3D view.<br><br>Please open in a recent Chrome, Edge, or Safari.'));
+try { const c=document.createElement('canvas'); if(!(c.getContext('webgl2')||c.getContext('webgl'))) throw 0; }
+catch(_){ fail('This device/browser has no WebGL 3D support.<br>Try a recent Chrome, Edge, or Safari.'); throw new Error('no-webgl'); }
+
+const app = document.getElementById('app');
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+app.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x0b1016, 0.018);
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.1, 2000);
+camera.up.set(0,0,1);                       // data is Z-up
+camera.position.set(9, -11, 6.5);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.target.set(0, 0, 1.0);
+controls.minDistance = 4; controls.maxDistance = 40;
+controls.maxPolarAngle = Math.PI*0.495;     // stay above the ground
+
+// subtle ground grid at z=0 (truck sits on it)
+const grid = new THREE.GridHelper(40, 40, 0x2a3a4d, 0x1b2735);
+grid.rotation.x = Math.PI/2; scene.add(grid);
+
+const clouds = {};
+function makeCloud(buf, size){
+  const N = new DataView(buf).getUint32(0, true);
+  const pos = new Float32Array(buf, 4, N*3);
+  const col = new Uint8Array(buf.slice(4 + N*12, 4 + N*12 + N*3));
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3, true));
+  g.computeBoundingSphere();
+  const m = new THREE.PointsMaterial({ size: size||0.03, vertexColors:true, sizeAttenuation:true });
+  return new THREE.Points(g, m);
+}
+
+async function load(name, size){
+  const buf = await (await fetch('clouds/'+name+'.bin')).arrayBuffer();
+  const pts = makeCloud(buf, size); pts.visible=false; scene.add(pts); clouds[name]=pts;
+}
+
+function show(view){
+  for (const k in clouds) clouds[k].visible = false;
+  if (clouds[view]) clouds[view].visible = true;
+  document.querySelectorAll('#ctl .btn[data-view]').forEach(b =>
+    b.classList.toggle('on', b.dataset.view===view));
+}
+
+document.querySelectorAll('#ctl .btn[data-view]').forEach(b =>
+  b.addEventListener('click', () => show(b.dataset.view)));
+let spinning=false;
+document.getElementById('spin').addEventListener('click', e => {
+  spinning=!spinning; e.target.classList.toggle('on', spinning);
+});
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+function animate(){
+  requestAnimationFrame(animate);
+  if (spinning){ const a=0.0032; const c=Math.cos(a),s=Math.sin(a);
+    const x=camera.position.x, y=camera.position.y;
+    camera.position.x=x*c-y*s; camera.position.y=x*s+y*c; }
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+(async () => {
+  // meta (volume / mass / truck)
+  try {
+    const meta = await (await fetch('clouds/meta.json')).json();
+    document.getElementById('truckid').textContent = meta.truck;
+    document.getElementById('volnum').innerHTML = meta.volume_m3 + ' <span>m³</span>';
+    document.getElementById('massnum').textContent = meta.mass_t;
+  } catch(e){}
+  await Promise.all([ load('full', 0.03), load('empty', 0.03), load('material', 0.035) ]);
+  show('full');
+  document.getElementById('load').classList.add('gone');
+  animate();
+})();
+</script>
+</body>
+</html>
