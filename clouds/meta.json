@@ -1,13 +1,12 @@
 {
   "truck": "37H11558",
-  "volume_m3": 14.0,
-  "mass_t": 20.9,
+  "volume_m3": 13.9,
+  "mass_t": 20.8,
   "density": 1.5,
-  "material_pts": 39326,
-  "full_pts": 111644,
-  "empty_pts": 120057,
+  "material_pts": 39122,
+  "structure_pts": 73951,
+  "empty_pts": 119847,
   "length_m": 7.8,
-  "width_m": 4.8,
-  "max_fill_m": 1.92,
+  "max_fill_m": 1.93,
   "reg_fitness": 0.8
 }
