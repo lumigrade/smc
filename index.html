@@ -129,7 +129,7 @@ const app = document.getElementById('app');
 const renderer = new THREE.WebGLRenderer({ antialias:true, preserveDrawingBuffer:true });
 renderer.setPixelRatio(Math.min(devicePixelRatio,2)); renderer.setSize(innerWidth,innerHeight); app.appendChild(renderer.domElement);
 
-const VER = '19';                      // bump every redeploy to bust browser/CDN cache
+const VER = '20';                      // bump every redeploy to bust browser/CDN cache
 // turbo colormap (matplotlib) lookup table — the "rainbow by height" theme
 const TURBO_LUT = [48,18,59,54,33,95,59,47,128,64,64,162,67,78,186,69,94,211,70,107,227,71,123,242,70,135,251,65,150,255,58,163,252,49,175,245,39,190,233,31,201,221,25,213,205,24,222,192,29,231,178,39,238,164,56,244,145,74,248,128,93,252,111,117,254,92,136,255,78,156,254,64,169,251,57,185,246,53,198,240,52,212,231,53,223,223,55,233,213,57,242,201,58,248,190,57,252,177,54,254,164,49,254,147,42,252,132,35,248,114,28,243,99,21,237,85,16,229,71,11,221,61,8,210,49,5,200,40,3,185,30,2,172,23,1,155,15,1,139,9,2,122,4,3];
 const VMAX = 3.5;                      // truck height for the height->colour mapping
@@ -153,7 +153,7 @@ function mkControls(up){                 // OrbitControls caches the up-frame at
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping=true; controls.dampingFactor=0.08;
   controls.minDistance=2; controls.maxDistance=60;
-  controls.maxPolarAngle = (up[1]===1) ? Math.PI : Math.PI*0.5;   // top (up=Y) full range; side/iso (up=Z) above-ground
+  controls.maxPolarAngle = Math.PI*0.5; controls.minPolarAngle = 0.10;   // always ground-locked Z-up; block the exactly-vertical singularity
   controls.target.copy(tgt);
   controls.addEventListener('start', ()=>{ userMoved=true; });
 }
@@ -284,7 +284,8 @@ document.querySelectorAll('#ctl .btn[data-theme]').forEach(b => b.addEventListen
 
 let spinning=false;
 document.getElementById('spin').addEventListener('click', e => { spinning=!spinning; e.target.classList.toggle('on', spinning); });
-const VIEWS={ top:{d:[0,0,1],u:[0,1,0]}, side:{d:[0,-1,0.03],u:[0,0,1]}, front:{d:[1,0,0.03],u:[0,0,1]}, iso:{d:[0.25,-0.95,0.30],u:[0,0,1]} };
+// all Z-up (ground-locked, no roll). Top is steep with X-component 0 so the truck stays horizontal.
+const VIEWS={ top:{d:[0,-0.16,0.987],u:[0,0,1]}, side:{d:[0,-1,0.05],u:[0,0,1]}, front:{d:[1,0,0.05],u:[0,0,1]}, iso:{d:[0.25,-0.95,0.30],u:[0,0,1]} };
 function applyView(n){ const v=VIEWS[n]||VIEWS.iso; mkControls(v.u); frameAll(new THREE.Vector3(...v.d), new THREE.Vector3(...v.u)); userMoved=true; }
 document.getElementById('vTop').addEventListener('click', () => applyView('top'));
 document.getElementById('v3D').addEventListener('click', () => applyView('iso'));
@@ -293,21 +294,20 @@ document.getElementById('v3D').addEventListener('click', () => applyView('iso'))
 const gizmoScene = new THREE.Scene();
 const gizmoCam = new THREE.OrthographicCamera(-1.7, 1.7, 1.7, -1.7, 0.1, 50);
 const GZ = 118; const gizmoTargets = [];
-function axisSprite(letter, hex){
+function axisSprite(letter, hex){    // transparent — just the coloured letter (dark outline for contrast), no disc background
   const cv=document.createElement('canvas'); cv.width=cv.height=64; const x=cv.getContext('2d');
-  x.beginPath(); x.arc(32,32,29,0,7); x.fillStyle=hex; x.fill();
-  x.fillStyle='#0b1016'; x.font='bold 40px '+FONT; x.textAlign='center'; x.textBaseline='middle'; x.fillText(letter,32,35);
+  x.font='bold 50px '+FONT; x.textAlign='center'; x.textBaseline='middle';
+  x.lineWidth=6; x.strokeStyle='rgba(6,10,16,0.95)'; x.strokeText(letter,32,34);
+  x.fillStyle=hex; x.fillText(letter,32,34);
   const t=new THREE.CanvasTexture(cv); t.anisotropy=4;
   return new THREE.Sprite(new THREE.SpriteMaterial({map:t, depthTest:false}));
 }
 function mkAxis(vec, color, hex, letter, view){
   gizmoScene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(
-    [new THREE.Vector3(0,0,0), vec.clone().multiplyScalar(0.8)]),
-    new THREE.LineBasicMaterial({color, transparent:true, opacity:0.85})));
-  const sp=axisSprite(letter, hex); sp.position.copy(vec); sp.scale.set(0.66,0.66,1); sp.userData={view};
+    [new THREE.Vector3(0,0,0), vec.clone().multiplyScalar(0.74)]),
+    new THREE.LineBasicMaterial({color, transparent:true, opacity:0.9})));
+  const sp=axisSprite(letter, hex); sp.position.copy(vec); sp.scale.set(0.72,0.72,1); sp.userData={view};
   gizmoScene.add(sp); gizmoTargets.push(sp);
-  const back=new THREE.Mesh(new THREE.SphereGeometry(0.13,12,12), new THREE.MeshBasicMaterial({color, transparent:true, opacity:0.3}));
-  back.position.copy(vec).multiplyScalar(-1); gizmoScene.add(back);
 }
 mkAxis(new THREE.Vector3(1,0,0), 0xff5a6a, '#ff5a6a', 'X', 'front');  // length -> look along X = front/rear
 mkAxis(new THREE.Vector3(0,1,0), 0x8ad46a, '#8ad46a', 'Y', 'side');   // width  -> look along Y = side
