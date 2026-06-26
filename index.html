@@ -53,11 +53,6 @@
   #note { bottom:16px; right:16px; max-width:min(320px,calc(100vw - 32px)); padding:11px 14px; font-size:11.5px; color:var(--mut); line-height:1.55; }
   #note b { color:var(--ink); }
   #hint { bottom:16px; left:150px; font-size:11px; color:var(--mut); padding:8px 12px; }
-  #zrot { left:14px; bottom:142px; display:flex; align-items:center; gap:6px; padding:6px 9px; }
-  #zrot .zlbl { font-size:10px; letter-spacing:.1em; color:var(--mut); }
-  #zrot button { width:26px; height:26px; border-radius:7px; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.05); color:var(--ink); font:700 17px/1 inherit; cursor:pointer; }
-  #zrot button:hover { background:rgba(255,255,255,.12); }
-  #zrot b { min-width:40px; text-align:center; font-size:13px; color:var(--gold); }
 
   #load { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:14px; background:var(--bg0); z-index:50; transition:opacity .5s; }
   #load.gone { opacity:0; pointer-events:none; }
@@ -107,11 +102,6 @@
   <button class="btn ghost" id="spin">⟳ Spin</button>
 </div>
 
-<div id="zrot" class="panel">
-  <span class="zlbl">ALIGN&nbsp;Z</span>
-  <button id="zminus">−</button><b id="zval">0°</b><button id="zplus">+</button>
-</div>
-
 <div id="note" class="panel"><b>How it works:</b> the LiDAR point cloud is a real measurement (no CAD).
   Every point above the empty-bed surface is classified as material; the volume is the integral of that
   height difference over the bed. The <b>bed max load</b> is this bed's own capacity from its measured
@@ -137,7 +127,7 @@ const app = document.getElementById('app');
 const renderer = new THREE.WebGLRenderer({ antialias:true, preserveDrawingBuffer:true });
 renderer.setPixelRatio(Math.min(devicePixelRatio,2)); renderer.setSize(innerWidth,innerHeight); app.appendChild(renderer.domElement);
 
-const VER = '22';                      // bump every redeploy to bust browser/CDN cache
+const VER = '23';                      // bump every redeploy to bust browser/CDN cache
 // turbo colormap (matplotlib) lookup table — the "rainbow by height" theme
 const TURBO_LUT = [48,18,59,54,33,95,59,47,128,64,64,162,67,78,186,69,94,211,70,107,227,71,123,242,70,135,251,65,150,255,58,163,252,49,175,245,39,190,233,31,201,221,25,213,205,24,222,192,29,231,178,39,238,164,56,244,145,74,248,128,93,252,111,117,254,92,136,255,78,156,254,64,169,251,57,185,246,53,198,240,52,212,231,53,223,223,55,233,213,57,242,201,58,248,190,57,252,177,54,254,164,49,254,147,42,252,132,35,248,114,28,243,99,21,237,85,16,229,71,11,221,61,8,210,49,5,200,40,3,185,30,2,172,23,1,155,15,1,139,9,2,122,4,3];
 const VMAX = 3.5;                      // truck height for the height->colour mapping
@@ -296,11 +286,6 @@ document.getElementById('spin').addEventListener('click', e => { spinning=!spinn
 // all Z-up (ground-locked, no roll). Top is steep with X-component 0 so the truck stays horizontal.
 const VIEWS={ top:{d:[0,-0.16,0.987],u:[0,0,1]}, side:{d:[0,-1,0.05],u:[0,0,1]}, front:{d:[1,0,0.05],u:[0,0,1]}, iso:{d:[0.25,-0.95,0.30],u:[0,0,1]} };
 function applyView(n){ const v=VIEWS[n]||VIEWS.iso; mkControls(v.u); frameAll(new THREE.Vector3(...v.d), new THREE.Vector3(...v.u)); userMoved=true; }
-// Z-rotation: align the truck to the grid by hand (the gizmo Z = top view, orbit = 3D — no buttons needed)
-let zdeg = 0;
-function setZ(d){ zdeg = Math.max(-30, Math.min(30, Math.round(d))); spin.rotation.z = zdeg*Math.PI/180; zval.textContent = (zdeg>0?'+':'')+zdeg+'°'; }
-zminus.onclick = () => setZ(zdeg-1);
-zplus.onclick  = () => setZ(zdeg+1);
 
 // --- clickable 3-axis orientation gizmo (bottom-left): click X/Y/Z -> front/side/top ---
 const gizmoScene = new THREE.Scene();
