@@ -52,7 +52,12 @@
 
   #note { bottom:16px; right:16px; max-width:min(320px,calc(100vw - 32px)); padding:11px 14px; font-size:11.5px; color:var(--mut); line-height:1.55; }
   #note b { color:var(--ink); }
-  #hint { bottom:16px; left:16px; font-size:11px; color:var(--mut); padding:8px 12px; }
+  #hint { bottom:16px; left:150px; font-size:11px; color:var(--mut); padding:8px 12px; }
+  #zrot { left:14px; bottom:142px; display:flex; align-items:center; gap:6px; padding:6px 9px; }
+  #zrot .zlbl { font-size:10px; letter-spacing:.1em; color:var(--mut); }
+  #zrot button { width:26px; height:26px; border-radius:7px; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.05); color:var(--ink); font:700 17px/1 inherit; cursor:pointer; }
+  #zrot button:hover { background:rgba(255,255,255,.12); }
+  #zrot b { min-width:40px; text-align:center; font-size:13px; color:var(--gold); }
 
   #load { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:14px; background:var(--bg0); z-index:50; transition:opacity .5s; }
   #load.gone { opacity:0; pointer-events:none; }
@@ -99,9 +104,12 @@
   <button class="btn on" data-theme="rainbow">🌈 Height</button>
   <button class="btn" data-theme="type">Steel + Gold</button>
   <span class="sep"></span>
-  <button class="btn ghost" id="vTop">⊤ Top</button>
-  <button class="btn ghost" id="v3D">◳ 3D</button>
   <button class="btn ghost" id="spin">⟳ Spin</button>
+</div>
+
+<div id="zrot" class="panel">
+  <span class="zlbl">ALIGN&nbsp;Z</span>
+  <button id="zminus">−</button><b id="zval">0°</b><button id="zplus">+</button>
 </div>
 
 <div id="note" class="panel"><b>How it works:</b> the LiDAR point cloud is a real measurement (no CAD).
@@ -129,7 +137,7 @@ const app = document.getElementById('app');
 const renderer = new THREE.WebGLRenderer({ antialias:true, preserveDrawingBuffer:true });
 renderer.setPixelRatio(Math.min(devicePixelRatio,2)); renderer.setSize(innerWidth,innerHeight); app.appendChild(renderer.domElement);
 
-const VER = '20';                      // bump every redeploy to bust browser/CDN cache
+const VER = '21';                      // bump every redeploy to bust browser/CDN cache
 // turbo colormap (matplotlib) lookup table — the "rainbow by height" theme
 const TURBO_LUT = [48,18,59,54,33,95,59,47,128,64,64,162,67,78,186,69,94,211,70,107,227,71,123,242,70,135,251,65,150,255,58,163,252,49,175,245,39,190,233,31,201,221,25,213,205,24,222,192,29,231,178,39,238,164,56,244,145,74,248,128,93,252,111,117,254,92,136,255,78,156,254,64,169,251,57,185,246,53,198,240,52,212,231,53,223,223,55,233,213,57,242,201,58,248,190,57,252,177,54,254,164,49,254,147,42,252,132,35,248,114,28,243,99,21,237,85,16,229,71,11,221,61,8,210,49,5,200,40,3,185,30,2,172,23,1,155,15,1,139,9,2,122,4,3];
 const VMAX = 3.5;                      // truck height for the height->colour mapping
@@ -143,6 +151,7 @@ function turboColor(t){
 let theme = 'rainbow';                 // default per client request
 let META = {};                         // meta.json (truck, volume, bed dims) for the 3D labels
 const scene = new THREE.Scene(); scene.fog = new THREE.FogExp2(0x0b1016, 0.016);
+const spin = new THREE.Group(); scene.add(spin);   // holds the truck + labels; user-rotatable about Z to align to the grid
 const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.1, 2000);
 camera.up.set(0,0,1); camera.position.set(9,-11,6.0);
 let userMoved=false, controls;
@@ -230,7 +239,7 @@ function buildLabels(){
   const bv=[]; be.forEach(e=>{ bv.push(...bp[e[0]],...bp[e[1]]); });
   const bgeo=new THREE.BufferGeometry(); bgeo.setAttribute('position',new THREE.Float32BufferAttribute(bv,3));
   grp.add(Object.assign(new THREE.LineSegments(bgeo,new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:0.45,depthTest:false})),{renderOrder:997}));
-  scene.add(grp);
+  spin.add(grp);
 }
 
 const grid = new THREE.GridHelper(50,50, 0x2a3a4d, 0x18232f); grid.rotation.x=Math.PI/2; scene.add(grid);
@@ -257,7 +266,7 @@ function makeCloud(buf, material){
 }
 async function load(name, material){
   const buf = await (await fetch('clouds/'+name+'.bin?v='+VER)).arrayBuffer();
-  const p = makeCloud(buf, material); p.visible=false; scene.add(p); clouds[name]=p;
+  const p = makeCloud(buf, material); p.visible=false; spin.add(p); clouds[name]=p;
 }
 
 function show(view){
@@ -287,8 +296,11 @@ document.getElementById('spin').addEventListener('click', e => { spinning=!spinn
 // all Z-up (ground-locked, no roll). Top is steep with X-component 0 so the truck stays horizontal.
 const VIEWS={ top:{d:[0,-0.16,0.987],u:[0,0,1]}, side:{d:[0,-1,0.05],u:[0,0,1]}, front:{d:[1,0,0.05],u:[0,0,1]}, iso:{d:[0.25,-0.95,0.30],u:[0,0,1]} };
 function applyView(n){ const v=VIEWS[n]||VIEWS.iso; mkControls(v.u); frameAll(new THREE.Vector3(...v.d), new THREE.Vector3(...v.u)); userMoved=true; }
-document.getElementById('vTop').addEventListener('click', () => applyView('top'));
-document.getElementById('v3D').addEventListener('click', () => applyView('iso'));
+// Z-rotation: align the truck to the grid by hand (the gizmo Z = top view, orbit = 3D — no buttons needed)
+let zdeg = 0;
+function setZ(d){ zdeg = Math.max(-30, Math.min(30, Math.round(d))); spin.rotation.z = zdeg*Math.PI/180; zval.textContent = (zdeg>0?'+':'')+zdeg+'°'; }
+zminus.onclick = () => setZ(zdeg-1);
+zplus.onclick  = () => setZ(zdeg+1);
 
 // --- clickable 3-axis orientation gizmo (bottom-left): click X/Y/Z -> front/side/top ---
 const gizmoScene = new THREE.Scene();
@@ -335,7 +347,8 @@ function animate(){
   requestAnimationFrame(animate);
   if (spinning){ const a=0.003,c=Math.cos(a),s=Math.sin(a),x=camera.position.x,y=camera.position.y;
     camera.position.x=x*c-y*s; camera.position.y=x*s+y*c; }
-  controls.update(); renderer.render(scene,camera); renderGizmo();
+  controls.update(); renderer.render(scene,camera);
+  renderer.autoClear=false; renderGizmo(); renderer.autoClear=true;   // overlay the gizmo without clearing colour (transparent bg)
 }
 
 (async () => {
@@ -343,7 +356,11 @@ function animate(){
     truckid.textContent=META.truck; volnum.innerHTML=META.volume_m3+' <span>m³</span>'; massnum.textContent=META.mass_t;
     fillnum.textContent=META.fill_pct; capnum.textContent=META.capacity_m3; } catch(e){}
   await Promise.all([ load('structure', bedMat), load('material', matMat), load('empty', bedMat) ]);
-  show('full'); setTheme('rainbow'); buildLabels(); frameAll(); loadEl.classList.add('gone'); animate();
+  show('full'); setTheme('rainbow'); buildLabels();
+  { const box=new THREE.Box3(); ['structure','empty','material'].forEach(k=>{if(clouds[k])box.expandByObject(clouds[k]);});
+    const ctr=box.getCenter(new THREE.Vector3()); ctr.z=0;     // pivot the Z-rotation about the truck's XY centre
+    spin.position.copy(ctr); spin.children.forEach(c=>c.position.sub(ctr)); }
+  frameAll(); loadEl.classList.add('gone'); animate();
   // re-frame after the viewport settles (mobile address-bar / late layout) until the user interacts
   requestAnimationFrame(()=>{ if(!userMoved) frameAll(); });
   setTimeout(()=>{ if(!userMoved) frameAll(); }, 500);
