@@ -1,12 +1,22 @@
 {
   "truck": "Batch62_LongPickup",
   "plate": "Long pickup \u00b7 B62",
-  "sweep": "single (manual)",
+  "sweep": "single",
   "single": true,
-  "material": "soil / fill",
-  "structure_pts": 87649,
+  "kind": "vehicle",
+  "material": "vehicle",
+  "length_m": 8.0,
+  "width_m": 2.5,
+  "height_m": 2.9,
+  "structure_pts": 82101,
   "material_pts": 0,
   "empty_pts": 0,
-  "length_m": 10.5,
-  "tilt_deg": 0.2
+  "box": {
+    "x0": -4.01,
+    "x1": 4.01,
+    "y0": -1.25,
+    "y1": 1.25,
+    "z0": 0.0,
+    "z1": 2.93
+  }
 }

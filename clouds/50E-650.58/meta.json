@@ -1,12 +1,22 @@
 {
   "truck": "50E-650.58",
   "plate": "50E-650.58",
-  "sweep": "single (manual)",
+  "sweep": "single (crane truck)",
   "single": true,
-  "material": "soil / fill",
-  "structure_pts": 166943,
+  "kind": "vehicle",
+  "material": "vehicle",
+  "length_m": 11.4,
+  "width_m": 2.8,
+  "height_m": 4.0,
+  "structure_pts": 165642,
   "material_pts": 0,
   "empty_pts": 0,
-  "length_m": 10.9,
-  "tilt_deg": -1.9
+  "box": {
+    "x0": -5.69,
+    "x1": 5.69,
+    "y0": -1.41,
+    "y1": 1.41,
+    "z0": 0.0,
+    "z1": 3.97
+  }
 }

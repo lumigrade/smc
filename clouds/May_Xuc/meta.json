@@ -1,0 +1,22 @@
+{
+  "truck": "May_Xuc",
+  "plate": "Excavator \u00b7 M\u00e1y x\u00fac",
+  "sweep": "single (excavator)",
+  "single": true,
+  "kind": "vehicle",
+  "material": "vehicle",
+  "length_m": 9.3,
+  "width_m": 3.3,
+  "height_m": 4.0,
+  "structure_pts": 72133,
+  "material_pts": 0,
+  "empty_pts": 0,
+  "box": {
+    "x0": -4.66,
+    "x1": 4.66,
+    "y0": -1.67,
+    "y1": 1.67,
+    "z0": 0.0,
+    "z1": 4.03
+  }
+}

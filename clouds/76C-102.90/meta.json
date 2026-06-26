@@ -1,12 +1,22 @@
 {
   "truck": "76C-102.90",
   "plate": "76C-102.90",
-  "sweep": "single (manual)",
+  "sweep": "single",
   "single": true,
-  "material": "soil / fill",
-  "structure_pts": 74538,
+  "kind": "vehicle",
+  "material": "vehicle",
+  "length_m": 7.6,
+  "width_m": 2.8,
+  "height_m": 3.1,
+  "structure_pts": 72955,
   "material_pts": 0,
   "empty_pts": 0,
-  "length_m": 7.7,
-  "tilt_deg": 1.4
+  "box": {
+    "x0": -3.78,
+    "x1": 3.78,
+    "y0": -1.38,
+    "y1": 1.38,
+    "z0": 0.0,
+    "z1": 3.12
+  }
 }
