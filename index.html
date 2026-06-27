@@ -87,9 +87,8 @@
 <div id="hdr" class="panel">
   <div class="tag">Smart Material Control</div>
   <h1>Truck load volume<br>measured by 3D LiDAR</h1>
-  <p>Live 3D scan of truck <span class="truck" id="truckid">37H11558</span> at the gate.
-     Two cross-mounted SICK scanners fuse into one model; comparing the
-     <b>full</b> vs <b>empty</b> bed measures the material automatically.</p>
+  <p>Live 3D LiDAR scan of truck <span class="truck" id="truckid">37H11558</span> at the gate.
+     Select a vehicle to view its scan, dimensions and measured load.</p>
 </div>
 
 <div id="vol" class="panel">
@@ -117,11 +116,10 @@
   <button class="btn ghost" id="spin">⟳ Spin</button>
 </div>
 
-<div id="note" class="panel"><b>How it works:</b> the LiDAR point cloud is a real measurement (no CAD).
-  Every point above the empty-bed surface is classified as material; the volume is the integral of that
-  height difference over the bed. The <b>bed max load</b> is this bed's own capacity from its measured
-  L×W×H — actual vs max is reported as data; pass/fail is set by contract. <b>🌈 Height</b> colours by
-  elevation; <b>Steel + Gold</b> tints load vs truck.</div>
+<div id="note" class="panel"><b>About:</b> a live 3D LiDAR scan of trucks at the gate — a real
+  measurement, not CAD. Pick a vehicle to view its point cloud, dimensions and load; figures are shown
+  as <b>data</b> (pass/fail is set by contract). <b>🌈 Height</b> colours by elevation;
+  <b>Steel + Gold</b> tints the load vs the truck.</div>
 <div id="hint" class="panel">drag to rotate · scroll / pinch to zoom</div>
 
 <script type="importmap">
@@ -142,7 +140,7 @@ const app = document.getElementById('app');
 const renderer = new THREE.WebGLRenderer({ antialias:true, preserveDrawingBuffer:true });
 renderer.setPixelRatio(Math.min(devicePixelRatio,2)); renderer.setSize(innerWidth,innerHeight); app.appendChild(renderer.domElement);
 
-const VER = '28';                      // bump every redeploy to bust browser/CDN cache
+const VER = '29';                      // bump every redeploy to bust browser/CDN cache
 // turbo colormap (matplotlib) lookup table — the "rainbow by height" theme
 const TURBO_LUT = [48,18,59,54,33,95,59,47,128,64,64,162,67,78,186,69,94,211,70,107,227,71,123,242,70,135,251,65,150,255,58,163,252,49,175,245,39,190,233,31,201,221,25,213,205,24,222,192,29,231,178,39,238,164,56,244,145,74,248,128,93,252,111,117,254,92,136,255,78,156,254,64,169,251,57,185,246,53,198,240,52,212,231,53,223,223,55,233,213,57,242,201,58,248,190,57,252,177,54,254,164,49,254,147,42,252,132,35,248,114,28,243,99,21,237,85,16,229,71,11,221,61,8,210,49,5,200,40,3,185,30,2,172,23,1,155,15,1,139,9,2,122,4,3];
 const VMAX = 3.5;                      // truck height for the height->colour mapping
