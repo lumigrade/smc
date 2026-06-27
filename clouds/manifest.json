@@ -203,7 +203,7 @@
       "length_m": 8.0,
       "width_m": 2.5,
       "height_m": 2.9,
-      "structure_pts": 82101,
+      "structure_pts": 82100,
       "material_pts": 0,
       "empty_pts": 0,
       "box": {
@@ -224,19 +224,19 @@
       "single": true,
       "kind": "vehicle",
       "material": "vehicle",
-      "length_m": 9.2,
-      "width_m": 3.3,
-      "height_m": 4.6,
-      "structure_pts": 105105,
+      "length_m": 9.0,
+      "width_m": 3.2,
+      "height_m": 4.2,
+      "structure_pts": 84924,
       "material_pts": 0,
       "empty_pts": 0,
       "box": {
-        "x0": -4.62,
-        "x1": 4.62,
-        "y0": -1.63,
-        "y1": 1.63,
+        "x0": -4.48,
+        "x1": 4.48,
+        "y0": -1.58,
+        "y1": 1.58,
         "z0": 0.0,
-        "z1": 4.55
+        "z1": 4.2
       },
       "id": "May_Xuc",
       "available": true
